@@ -238,7 +238,7 @@ def add_owid_covid19_data(engine, table):
     print(f"insert done into: {table}")
 
 
-def add_covid19_tracker_data2(engine, table,  config_data, df_pop, add_SE2=True):
+def add_covid19_tracker_data(engine, table,  config_data, df_pop, add_SE2=True):
     ##########################################
     # get data from coronavirus-tracker API
     #
@@ -505,7 +505,7 @@ def main():
     # get data from coronavirus-tracker API
     #
     if config_data["datasources"]["covid_tracker"]:
-        add_covid19_tracker_data2(engine, "covid19", config_data, df_pop, add_SE2=True)
+        add_covid19_tracker_data(engine, "covid19", config_data, df_pop, add_SE2=True)
 
     add_country_info(engine, "country_info", df_pop, config_data)
 
