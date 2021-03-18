@@ -16,10 +16,11 @@ from urllib.request import urlopen
 #
 
 def get_newest_mortality_link():
-    url = 'https://www.bfs.admin.ch/bfs/de/home/statistiken/gesundheit/gesundheitszustand/sterblichkeit-todesursachen.assetdetail.16006453.html'
+    url = 'https://www.bfs.admin.ch/bfs/de/home/statistiken/gesundheit/gesundheitszustand/sterblichkeit-todesursachen' \
+          '.assetdetail.16006453.html '
     page = requests.get(url, timeout=2)
     soup = BeautifulSoup(page.content, "html.parser")  # converts the page content into a beautifulsoup object
-    new_url = f"https://www.bfs.admin.ch{soup.find('div', {'class': 'alert bg-success glyphicon-refresh text-success'}).find('a', href=True)['href']}"
+    new_url = f"https://www.bfs.admin.ch{soup.find('div', {'class': 'alert bg-success glyphicon-refresh text-success'}).find('a', href=True)['href']} "
     page = requests.get(new_url, timeout=2)
     soup = BeautifulSoup(page.content, "html.parser")  # converts the page content into a beautifulsoup object
     new_link = f"https://www.bfs.admin.ch{soup.findAll('a', {'class': 'icon icon--before icon--doc js-ga-bfs-download-event'})[0]['href']}"
@@ -28,7 +29,8 @@ def get_newest_mortality_link():
 
 def wikidata_get_population_all_countries():
     sparql = SPARQLWrapper("https://query.wikidata.org/sparql",
-                           agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36')
+                           agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, '
+                                 'like Gecko) Chrome/50.0.2661.102 Safari/537.36')
     sparql.setQuery("""
     SELECT ?country ?countryLabel ?population ?countrycode{
     ?country wdt:P1082 ?population .
@@ -62,7 +64,7 @@ def wikidata_get_population_all_countries():
 
 def is_internet_on():
     try:
-        response = urlopen('https://www.google.com/', timeout=10)
+        urlopen('https://www.google.com/', timeout=10)
         return True
     except:
         return False
@@ -238,7 +240,7 @@ def add_owid_covid19_data(engine, table):
     print(f"insert done into: {table}")
 
 
-def add_covid19_tracker_data(engine, table,  config_data, df_pop, add_SE2=True):
+def add_covid19_tracker_data(engine, table, config_data, df_pop, add_SE2=True):
     ##########################################
     # get data from coronavirus-tracker API
     #
@@ -263,7 +265,6 @@ def add_covid19_tracker_data(engine, table,  config_data, df_pop, add_SE2=True):
 
     data = response.text
     parsed = json.loads(data)
-    nr_of_days = len(parsed["deaths"]["locations"][0]["history"].items())
     nr_of_countries = len(parsed["deaths"]["locations"])  # + 1  # x Countries +1 for sweden
 
     # To read out the array index
@@ -272,7 +273,6 @@ def add_covid19_tracker_data(engine, table,  config_data, df_pop, add_SE2=True):
     for country in config_data["countries_of_interest"]:
         country_code_two_digits[country] = 0
         country_code_three_digits[countries.get(country)[2]] = 0
-    # country_code_three_digits["SE2"] = nr_of_countries -1
 
     # -------------------------------------------------------------------
     # Get the magic country code number out of the parsed json object.
@@ -304,27 +304,27 @@ def add_covid19_tracker_data(engine, table,  config_data, df_pop, add_SE2=True):
 
         SE2_DateDeaths = []
         for i in range(2, ws.max_row):
-            if (isinstance(ws.cell(row=i, column=1).value, datetime.date)):
-                SE2_DateDeaths.append((ws.cell(row=i, column=1).value))
+            if isinstance(ws.cell(row=i, column=1).value, datetime.date):
+                SE2_DateDeaths.append(ws.cell(row=i, column=1).value)
             else:
                 break
 
         SE2_Deaths = []
         for i in range(2, ws.max_row):
-            if (isinstance(ws.cell(row=i, column=1).value, datetime.date)):
-                if (i >= 3):
-                    SE2_Deaths.append((ws.cell(row=i, column=2).value) + SE2_Deaths[i - 3])
+            if isinstance(ws.cell(row=i, column=1).value, datetime.date):
+                if i >= 3:
+                    SE2_Deaths.append(ws.cell(row=i, column=2).value + SE2_Deaths[i - 3])
                 else:
-                    SE2_Deaths.append((ws.cell(row=i, column=2).value))
+                    SE2_Deaths.append(ws.cell(row=i, column=2).value)
             else:
                 break
 
         k = 0
         for key, value in parsed["deaths"]["locations"][country_code_three_digits["SE2"]]["history"].items():
-            if (k >= len(SE2_DateDeaths)):
+            if k >= len(SE2_DateDeaths):
                 parsed["deaths"]["locations"][country_code_three_digits["SE2"]]["history"][key] = SE2_Deaths[k - 1]
             else:
-                if (datetime.datetime.strptime(key, "%m/%d/%y").date() == SE2_DateDeaths[k].date()):
+                if datetime.datetime.strptime(key, "%m/%d/%y").date() == SE2_DateDeaths[k].date():
                     parsed["deaths"]["locations"][country_code_three_digits["SE2"]]["history"][key] = SE2_Deaths[k]
                     k += 1
                 else:
@@ -332,16 +332,17 @@ def add_covid19_tracker_data(engine, table,  config_data, df_pop, add_SE2=True):
 
     df = pd.DataFrame()
     for three_digit, value_three_digit in country_code_three_digits.items():
-        df = df.append(pd.DataFrame(zip(list(parsed["deaths"]["locations"][value_three_digit]["history"].keys()),
-                                        list([three_digit for x in range(len(
-                                            parsed["deaths"]["locations"][value_three_digit]["history"].items()))]),
-                                        list([countries.get(parsed["confirmed"]["locations"][value_three_digit][
-                                                 "country_code"])[2] for x in range(len(
-                                            parsed["deaths"]["locations"][value_three_digit]["history"].items()))]),
-                                        list(parsed["confirmed"]["locations"][value_three_digit][
-                                                 "history"].values()),
-                                        list(parsed["deaths"]["locations"][value_three_digit]["history"].values())),
-                                    columns=['date', 'countrycode', 'country_code_for_pop', 'confirmed', 'deaths']), ignore_index=True)
+        df = df.append(pd.DataFrame(
+            zip(list(parsed["deaths"]["locations"][value_three_digit]["history"].keys()),
+                list([three_digit for _x in range(len(
+                    parsed["deaths"]["locations"][value_three_digit]["history"].items()))]),
+                list([countries.get(parsed["confirmed"]["locations"][value_three_digit]["country_code"])[2] for _x in
+                      range(len(
+                          parsed["deaths"]["locations"][value_three_digit]["history"].items()))]),
+                list(parsed["confirmed"]["locations"][value_three_digit]["history"].values()),
+                list(parsed["deaths"]["locations"][value_three_digit]["history"].values())),
+            columns=['date', 'countrycode', 'country_code_for_pop', 'confirmed', 'deaths']),
+            ignore_index=True)
     df['date'] = pd.to_datetime(df['date'])
 
     df['confirmedperpop'] = 1e6 / df['country_code_for_pop'].map(df_pop.set_index('countrycode')['population']) * df[
@@ -358,7 +359,8 @@ def add_covid19_tracker_data(engine, table,  config_data, df_pop, add_SE2=True):
     df['newconfirmedperpopfilt7d'] = df.sort_values('date').groupby('countrycode')['newconfirmedperpop'].rolling(
         7).mean().reset_index(0, drop=True)
 
-    df['deathsperpop'] = 1e6 / df['country_code_for_pop'].map(df_pop.set_index('countrycode')['population']) * df['deaths']
+    df['deathsperpop'] = 1e6 / df['country_code_for_pop'].map(df_pop.set_index('countrycode')['population']) * df[
+        'deaths']
     df['newdeaths'] = df.sort_values('date').groupby('countrycode')['deaths'].diff().fillna(0)
     df['newdeathsperpop'] = 1e6 / df['country_code_for_pop'].map(df_pop.set_index('countrycode')['population']) * df[
         'newdeaths']
