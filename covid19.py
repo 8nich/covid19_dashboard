@@ -313,7 +313,6 @@ def add_openzh_covid19_data(engine, table):
     with engine.connect() as con:
         df.to_sql(name=table, con=con, if_exists='replace', index=True)
     engine.dispose()
-    df.to_excel('COVID19_Fallzahlen_CH_total_v2_acs.xlsx')
     print(f"insert done into: {table}")
     return df
 

@@ -1,0 +1,16 @@
+{
+    "mysql-engine" : "mysql+mysqldb://scott:tiger@localhost/foo",
+    "datasources" :
+    {
+      "wikidata": true,
+      "bfs_mortality": true,
+      "bfs_mortalityrate": true,
+      "bfs_population": true,
+      "bag_tested": false,
+      "openzh_covid19": false,
+      "owid_covid19": false,
+      "covid_tracker": false
+    },
+    "countries_of_interest": [ "IT", "ES", "FR", "CH", "DE", "KR", "IR", "GB", "IE", "NL", "BE", "US", "JP", "BR",
+      "AT", "GR", "TR", "PT", "SE", "NO", "DK", "FI", "BY", "RU", "NZ", "VN", "IS", "IL", "IN", "EG", "PL", "PH"]
+}
