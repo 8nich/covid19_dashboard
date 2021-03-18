@@ -1,9 +1,6 @@
 import requests
 import json
 import datetime
-from numpy import zeros
-from numpy import ones
-from mysql_acs import MysqlAcs
 from openpyxl import load_workbook
 import copy
 from SPARQLWrapper import SPARQLWrapper, JSON
@@ -11,76 +8,12 @@ import pandas as pd
 from iso3166 import countries
 from sqlalchemy import create_engine
 from bs4 import BeautifulSoup
-from tqdm import tqdm
 from urllib.request import urlopen
 
 
 # ----------------------------------------------------------------------------------
 # Functions
 #
-def mysql_build_insert_string(TableName, Columns):
-    string = "INSERT INTO "
-    string = string + TableName + " ("
-
-    i = 0
-    while i < len(Columns):
-        if i == len(Columns) - 1:
-            string = string + "`" + Columns[i] + "`"
-        else:
-            string = string + "`" + Columns[i] + "`" + ", "
-        i += 1
-    string = string + ") VALUES ("
-
-    i = 0
-    while i < len(Columns):
-        if i == len(Columns) - 1:
-            string = string + "%s"
-        else:
-            string = string + "%s" + ", "
-        i += 1
-    string = string + ")"
-    return string
-
-
-def App_buildMultipleRowsDataForMySQL2(id, Date, CountryCode, Values2D):
-    val = []
-    k = 0
-    while k < len(Date):
-        i = 0
-        str = (id + k * 1,)
-        str = str + (Date[k],)
-        str = str + (CountryCode[k],)
-        for i in range(0, len(Values2D[0] - 1)):
-            str = str + (float(Values2D[k][i]),)
-            i += 1
-        k += 1
-        val.append(str)
-    return (val)
-
-
-def App_buildRowsDataForMySQL(id, SecondowData, OtherRowsData):
-    val = []
-    k = 0
-    string = ""
-    string = (id, SecondowData,)
-    while k < len(OtherRowsData):
-        string = string + (OtherRowsData[k],)
-        k += 1
-    val.append(string)
-    return (string)
-
-
-def filt(Array, Index, Tabs):
-    sum = 0
-    k = 0
-    while k < Tabs:
-        if ((Index - Tabs + 1 + k) >= 0):
-            sum = sum + Array[Index - Tabs + 1 + k]
-        else:
-            return Array[Index]
-        k += 1
-    return float(sum) / float(Tabs)
-
 
 def get_newest_mortality_link():
     url = 'https://www.bfs.admin.ch/bfs/de/home/statistiken/gesundheit/gesundheitszustand/sterblichkeit-todesursachen.assetdetail.16006453.html'
@@ -94,26 +27,6 @@ def get_newest_mortality_link():
 
 
 def wikidata_get_population_all_countries():
-    sparql = SPARQLWrapper("https://query.wikidata.org/sparql",
-                           agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36')
-    sparql.setQuery("""
-    SELECT ?country ?countryLabel ?population ?countrycode{
-    ?country wdt:P1082 ?population .
-    ?country wdt:P298 ?countrycode.
-    SERVICE wikibase:label { bd:serviceParam wikibase:language "en" }
-    {
-        SELECT ?country  WHERE {
-        ?city wdt:P31 wd:Q515 .
-        ?city wdt:P17 ?country .
-        } GROUP BY ?country 
-    }
-    } """)
-    sparql.setReturnFormat(JSON)
-    results = sparql.query().convert()
-    return results["results"]["bindings"]
-
-
-def wikidata_get_population_all_countries2():
     sparql = SPARQLWrapper("https://query.wikidata.org/sparql",
                            agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36')
     sparql.setQuery("""
@@ -145,13 +58,6 @@ def wikidata_get_population_all_countries2():
     df_pop = df_pop.drop_duplicates(subset=['countrycode'])
     df_pop['population'] = pd.to_numeric(df_pop['population'])
     return df_pop
-
-
-def find_in_list(lst, key1, key2, value):
-    for i, dic in enumerate(lst):
-        if dic[key1][key2] == value:
-            return i
-    return -1
 
 
 def is_internet_on():
@@ -332,349 +238,6 @@ def add_owid_covid19_data(engine, table):
     print(f"insert done into: {table}")
 
 
-def add_covid19_tracker_data(engine, config_data, wikidata_pop):
-    url1 = "https://cvtapi.nl/all"
-    url2 = "https://coronavirus-tracker-api.herokuapp.com/all"
-    url3 = "https://covid-tracker-us.herokuapp.com/all"
-    urls = (url1, url2, url3)
-
-    valid_response = False
-    for url in urls:
-        response = requests.get(url)
-        if response.status_code == 200:
-            valid_response = True
-            break
-        else:
-            continue
-
-    if not valid_response:
-        print('Could not get data from the coronavirus-tracker API')
-        return -1
-
-    data = response.text
-    parsed = json.loads(data)
-    nr_of_days = len(parsed["deaths"]["locations"][0]["history"].items())
-    nr_of_countries = len(parsed["deaths"]["locations"]) + 1  # x Countries +1 for sweden
-
-    population = ones(nr_of_countries, float)
-
-    # To read out the array index
-    country_code_two_digits = {}
-    country_code_three_digits = {}
-    for country in config_data["countries_of_interest"]:
-        country_code_two_digits[country] = 0
-        country_code_three_digits[countries.get(country)[2]] = 0
-    country_code_three_digits["SE2"] = nr_of_countries - 1
-
-    # -------------------------------------------------------------------
-    # Get the magic country code number out of the parsed json object.
-    #
-    for i in range(0, nr_of_countries - 2):
-        if parsed["deaths"]["locations"][i]["country_code"] in country_code_two_digits and \
-                parsed["deaths"]["locations"][i][
-                    "province"] == "":
-            country_code_two_digits[parsed["deaths"]["locations"][i]["country_code"]] = i
-            country_code_three_digits[countries.get(parsed["deaths"]["locations"][i]["country_code"])[
-                2]] = i  # change from 2digit to three digits.
-
-    DatabaseColumns = {
-        "id": 0,
-        "date": 1,
-        "countrycode": 2,
-        "confirmed": 3,
-        "confirmedperpop": 4,
-        "newconfirmed": 5,
-        "newconfirmedperpop": 6,
-        "newconfirmedfilt3d": 7,
-        "newconfirmedfilt7d": 8,
-        "newconfirmedperpopfilt3d": 9,
-        "newconfirmedperpopfilt7d": 10,
-        "deaths": 11,
-        "deathsperpop": 12,
-        "newdeaths": 13,
-        "newdeathsperpop": 14,
-        "newdeathsfilt3d": 15,
-        "newdeathsfilt7d": 16,
-        "newdeathsperpopfilt3d": 17,
-        "newdeathsperpopfilt7d": 18,
-        "newtestednegative": 19,
-        "newtestednegativefilt7d": 20
-    }
-
-    DatabaseColumnsDataType = {
-        "id": "INT AUTO_INCREMENT PRIMARY KEY",
-        "date": "date",
-        "countrycode": "VARCHAR(3)",
-        "confirmed": "float(23)",
-        "confirmedperpop": "float(23)",
-        "newconfirmed": "float(23)",
-        "newconfirmedperpop": "float(23)",
-        "newconfirmedfilt3d": "float(23)",
-        "newconfirmedfilt7d": "float(23)",
-        "newconfirmedperpopfilt3d": "float(23)",
-        "newconfirmedperpopfilt7d": "float(23)",
-        "deaths": "float(23)",
-        "deathsperpop": "float(23)",
-        "newdeaths": "float(23)",
-        "newdeathsperpop": "float(23)",
-        "newdeathsfilt3d": "float(23)",
-        "newdeathsfilt7d": "float(23)",
-        "newdeathsperpopfilt3d": "float(23)",
-        "newdeathsperpopfilt7d": "float(23)",
-        "newtestednegative": "float(23)",
-        "newtestednegativefilt7d": "float(23)"
-    }
-
-    Columns = []
-    ColumnsCountryInfo = []
-    ColumnsDataType = []
-    ColumnsCountryInfoDataType = []
-    for key, value in country_code_three_digits.items():
-        ColumnsCountryInfo.append(key)
-        ColumnsCountryInfoDataType.append("VARCHAR(255)")
-
-    for key, value in DatabaseColumns.items():
-        Columns.append(key)
-    for key, value in DatabaseColumnsDataType.items():
-        ColumnsDataType.append(value)
-
-    ColumnsCountryInfo.insert(0, "ID")
-    ColumnsCountryInfo.insert(1, "Type")
-
-    ColumnsCountryInfoDataType.insert(0, "INT AUTO_INCREMENT PRIMARY KEY")
-    ColumnsCountryInfoDataType.insert(1, "VARCHAR(255)")
-
-    ##########################################
-    # add tested CH from Excel
-    # not really needed anymore (owid)
-    #
-    url = 'https://www.bag.admin.ch/dam/bag/de/dokumente/mt/k-und-i/aktuelle-ausbrueche-pandemien/2019-nCoV/covid-19-basisdaten-labortests.xlsx.download.xlsx/Dashboard_3_COVID19_labtests_positivity.xlsx'
-    myfile = requests.get(url)
-    open('Dashboard_3_COVID19_labtests_positivity.xlsx', 'wb').write(myfile.content)
-    df = pd.read_excel(r'Dashboard_3_COVID19_labtests_positivity.xlsx')
-
-    CH_TestedPositive = []
-    CH_TestedNegative = []
-    CH_DateTested = []
-    for i in range(0, df.index.stop):
-        if (df.values[i][3] == "Positive"):
-            CH_TestedPositive.append(df.values[i][2])
-            CH_DateTested.append(df.values[i][1])
-        elif (df.values[i][3] == "Negative"):
-            CH_TestedNegative.append(df.values[i][2])
-
-    ##########################################
-    # add SE2 from Excel to JSON
-    # used for more accurate deaths time of sweden
-    #
-    SE2_confimred_json = copy.deepcopy(parsed["confirmed"]["locations"][country_code_three_digits["SWE"]])
-    SE2_deaths_json = copy.deepcopy(parsed["deaths"]["locations"][country_code_three_digits["SWE"]])
-    parsed["deaths"]["locations"].append(SE2_deaths_json)
-    parsed["confirmed"]["locations"].append(SE2_confimred_json)
-
-    url = 'https://www.arcgis.com/sharing/rest/content/items/b5e7488e117749c19881cce45db13f7e/data'
-    myfile = requests.get(url, allow_redirects=True)
-    open('Folkhalsomyndigheten_Covid19.xlsx', 'wb').write(myfile.content)
-    wb = load_workbook(filename='Folkhalsomyndigheten_Covid19.xlsx')
-    ws = wb['Antal avlidna per dag']
-
-    SE2_DateDeaths = []
-    for i in range(2, ws.max_row):
-        if (isinstance(ws.cell(row=i, column=1).value, datetime.date)):
-            SE2_DateDeaths.append((ws.cell(row=i, column=1).value))
-        else:
-            break
-
-    SE2_Deaths = []
-    for i in range(2, ws.max_row):
-        if (isinstance(ws.cell(row=i, column=1).value, datetime.date)):
-            if (i >= 3):
-                SE2_Deaths.append((ws.cell(row=i, column=2).value) + SE2_Deaths[i - 3])
-            else:
-                SE2_Deaths.append((ws.cell(row=i, column=2).value))
-        else:
-            break
-
-    k = 0
-    for key, value in tqdm(parsed["deaths"]["locations"][country_code_three_digits["SE2"]]["history"].items()):
-        if (k >= len(SE2_DateDeaths)):
-            parsed["deaths"]["locations"][country_code_three_digits["SE2"]]["history"][key] = SE2_Deaths[k - 1]
-        else:
-            if (datetime.datetime.strptime(key, "%m/%d/%y").date() == SE2_DateDeaths[k].date()):
-                parsed["deaths"]["locations"][country_code_three_digits["SE2"]]["history"][key] = SE2_Deaths[k]
-                k += 1
-            else:
-                parsed["deaths"]["locations"][country_code_three_digits["SE2"]]["history"][key] = 0
-
-    ##########################################
-    # Additional Information
-    #
-    CountryNames = []
-    CountryValues = []
-    CountryDigits = []
-    print("--")
-    for key, value in country_code_three_digits.items():
-        CountryNames.append(parsed["deaths"]["locations"][value]["country"])
-        current_countryCode = countries.get(parsed["deaths"]["locations"][value]["country_code"])[2]
-        population[country_code_three_digits[key]] = \
-            wikidata_pop[find_in_list(wikidata_pop, "countrycode", "value", current_countryCode)]["population"][
-                "value"]  # get population out of Wikidata
-        print(key, parsed["deaths"]["locations"][value]["country"], population[country_code_three_digits[key]])
-        CountryValues.append(value)
-        CountryDigits.append(parsed["deaths"]["locations"][value]["country_code"])
-    print("--")
-
-    CountryCodesColumn = []
-
-    ##########################################
-    # Deaths  related
-    #
-    Deaths = []
-    DeathsPerPopulation = []
-    NewDeaths = []
-    NewDeathsFilt3d = []
-    NewDeathsFilt7d = []
-    NewDeathsPerPopulation = []
-    NewDeathsPerPopulationFilt3d = []
-    NewDeathsPerPopulationFilt7d = []
-    DateDeaths = []
-
-    i = 0
-    for key1, value1 in tqdm(country_code_three_digits.items()):
-        k = 0
-        for key, value in parsed["deaths"]["locations"][value1]["history"].items():
-            DateDeaths.append(datetime.datetime.strptime(key, "%m/%d/%y").date())  # only 1 Dimension
-            Deaths.append(value)
-            CountryCodesColumn.append(key1)
-            DeathsPerPopulation.append(float((1e6 / population[value1]) * float(value)))  # in ppm
-            if k > 0:
-                if (value - Deaths[i * nr_of_days + k - 1]) >= 0:
-                    NewDeaths.append(value - Deaths[i * nr_of_days + k - 1])  # in ppm
-                else:
-                    NewDeaths.append(0)  # in ppm
-            else:
-                NewDeaths.append(value)  # first
-            NewDeathsPerPopulation.append(
-                float((1e6 / population[value1]) * float(NewDeaths[i * nr_of_days + k])))  # in ppm
-            # ---------------- Filter -----------------------------
-            if k > 2:
-                NewDeathsFilt3d.append(
-                    filt(NewDeaths, i * nr_of_days + k, 3))  # simple average filter over last three values
-            else:
-                NewDeathsFilt3d.append(NewDeaths[i * nr_of_days + k])
-            if k > 6:
-                NewDeathsFilt7d.append(
-                    filt(NewDeaths, i * nr_of_days + k, 7))  # simple average filter over last seven values
-            else:
-                NewDeathsFilt7d.append(NewDeaths[i * nr_of_days + k])
-
-            NewDeathsPerPopulationFilt3d.append(
-                float((1e6 / float(population[value1])) * float(NewDeathsFilt3d[i * nr_of_days + k])))  # in ppm
-            NewDeathsPerPopulationFilt7d.append(
-                float((1e6 / float(population[value1])) * float(NewDeathsFilt7d[i * nr_of_days + k])))  # in ppm
-            k += 1
-        i += 1
-
-    ##########################################
-    # Confirmed cases related
-    #
-    Confirmed = []
-    ConfirmedPerPopulation = []
-    NewConfirmed = []
-    NewConfirmedFilt3d = []
-    NewConfirmedFilt7d = []
-    NewConfirmedPerPopulation = []
-    NewConfirmedPerPopulationFilt3d = []
-    NewConfirmedPerPopulationFilt7d = []
-    NewTestedNegativeFilt7d = []
-    DateConfirmed = []
-    DateTested = []
-    NewTestedNegative = []
-
-    i = 0
-    for key1, value1 in tqdm(country_code_three_digits.items()):
-        k = 0
-        s = 0
-        for key, value in parsed["confirmed"]["locations"][value1]["history"].items():
-            if s < len(CH_DateTested) and datetime.datetime.strptime(key, "%m/%d/%y").date() == CH_DateTested[
-                s].date() and key1 == 'CHE':
-                DateTested.append(CH_DateTested[s].date())
-                NewTestedNegative.append(CH_TestedNegative[s])
-                s += 1
-            else:
-                NewTestedNegative.append(0)
-            DateConfirmed.append(datetime.datetime.strptime(key, "%m/%d/%y").date())  # only 1 Dimension
-            Confirmed.append(value)
-            ConfirmedPerPopulation.append(float((1e6 / float(population[value1])) * float(value)))  # in ppm
-            if k > 0:
-                NewConfirmed.append(value - Confirmed[i * nr_of_days + k - 1])
-            else:
-                NewConfirmed.append(value)  # first
-            NewConfirmedPerPopulation.append(
-                float((1e6 / float(population[value1])) * float(NewConfirmed[i * nr_of_days + k])))  # in ppm
-            # ---------------- Filter -----------------------------
-            if k > 2:
-                NewConfirmedFilt3d.append(
-                    filt(NewConfirmed, i * nr_of_days + k, 3))  # simple average filter over last three values
-            else:
-                NewConfirmedFilt3d.append(NewConfirmed[i * nr_of_days + k])
-            if k > 6:
-                NewConfirmedFilt7d.append(
-                    filt(NewConfirmed, i * nr_of_days + k, 7))  # simple average filter over last seven values
-                NewTestedNegativeFilt7d.append(filt(NewTestedNegative, i * nr_of_days + k, 7))
-            else:
-                NewConfirmedFilt7d.append(NewConfirmed[i * nr_of_days + k])
-                NewTestedNegativeFilt7d.append(NewTestedNegative[i * nr_of_days + k])
-
-            NewConfirmedPerPopulationFilt3d.append(
-                float((1e6 / float(population[value1])) * float(NewConfirmedFilt3d[i * nr_of_days + k])))  # in ppm
-            NewConfirmedPerPopulationFilt7d.append(
-                float((1e6 / float(population[value1])) * float(NewConfirmedFilt7d[i * nr_of_days + k])))  # in ppm
-            k += 1
-        i += 1
-
-    AllData = zeros([len(country_code_three_digits) * nr_of_days, len(DatabaseColumns) - 3], float)
-    AllData[:, DatabaseColumns["confirmed"] - 3] = Confirmed
-    AllData[:, DatabaseColumns["confirmedperpop"] - 3] = ConfirmedPerPopulation
-    AllData[:, DatabaseColumns["newconfirmed"] - 3] = NewConfirmed
-    AllData[:, DatabaseColumns["newconfirmedperpop"] - 3] = NewConfirmedPerPopulation
-    AllData[:, DatabaseColumns["newconfirmedfilt3d"] - 3] = NewConfirmedFilt3d
-    AllData[:, DatabaseColumns["newconfirmedfilt7d"] - 3] = NewConfirmedFilt7d
-    AllData[:, DatabaseColumns["newconfirmedperpopfilt3d"] - 3] = NewConfirmedPerPopulationFilt3d
-    AllData[:, DatabaseColumns["newconfirmedperpopfilt7d"] - 3] = NewConfirmedPerPopulationFilt7d
-    AllData[:, DatabaseColumns["deaths"] - 3] = Deaths
-    AllData[:, DatabaseColumns["deathsperpop"] - 3] = DeathsPerPopulation
-    AllData[:, DatabaseColumns["newdeaths"] - 3] = NewDeaths
-    AllData[:, DatabaseColumns["newdeathsperpop"] - 3] = NewDeathsPerPopulation
-    AllData[:, DatabaseColumns["newdeathsfilt3d"] - 3] = NewDeathsFilt3d
-    AllData[:, DatabaseColumns["newdeathsfilt7d"] - 3] = NewDeathsFilt7d
-    AllData[:, DatabaseColumns["newdeathsperpopfilt3d"] - 3] = NewDeathsPerPopulationFilt3d
-    AllData[:, DatabaseColumns["newdeathsperpopfilt7d"] - 3] = NewDeathsPerPopulationFilt7d
-    AllData[:, DatabaseColumns["newtestednegative"] - 3] = NewTestedNegative
-    AllData[:, DatabaseColumns["newtestednegativefilt7d"] - 3] = NewTestedNegativeFilt7d
-
-    # insert additional Information into 5 Tables
-    #
-    mysql_o = MysqlAcs(engine)
-    mysql_o.dropTableIfExistsMySQL("countryInfo")
-    mysql_o.createTableMySQL("countryInfo", ColumnsCountryInfo, ColumnsCountryInfoDataType)
-    mysql_o.insertIntoMySQL(mysql_build_insert_string("countryInfo", ColumnsCountryInfo),
-                            App_buildRowsDataForMySQL(1, "CountryName", CountryNames))
-    mysql_o.insertIntoMySQL(mysql_build_insert_string("countryInfo", ColumnsCountryInfo),
-                            App_buildRowsDataForMySQL(2, "CountryNumber", CountryValues))
-    mysql_o.insertIntoMySQL(mysql_build_insert_string("countryInfo", ColumnsCountryInfo),
-                            App_buildRowsDataForMySQL(3, "CountryDigits", CountryDigits))
-
-    print("insert done countryinfo")
-
-    mysql_o.dropTableIfExistsMySQL("covid19")
-    mysql_o.createTableMySQL("covid19", Columns, ColumnsDataType)
-    mysql_o.insertIntoManyMySQL(mysql_build_insert_string("covid19", Columns),
-                                App_buildMultipleRowsDataForMySQL2(1, DateDeaths, CountryCodesColumn, AllData))
-
-    print(f"insert done into: covid19")
-
-
 def add_covid19_tracker_data2(engine, table,  config_data, df_pop, add_SE2=True):
     ##########################################
     # get data from coronavirus-tracker API
@@ -685,6 +248,7 @@ def add_covid19_tracker_data2(engine, table,  config_data, df_pop, add_SE2=True)
     urls = (url1, url2, url3)
 
     valid_response = False
+    response = []
     for url in urls:
         response = requests.get(url)
         if response.status_code == 200:
@@ -899,9 +463,7 @@ def main():
     ##########################################
     # get population of All countries
     #
-    # if config_data["datasources"]["wikidata"]:
-    #wikidata_pop = wikidata_get_population_all_countries()
-    df_pop = wikidata_get_population_all_countries2()
+    df_pop = wikidata_get_population_all_countries()
 
     ##########################################
     # add mortality from 2010 ... 2021
@@ -943,7 +505,6 @@ def main():
     # get data from coronavirus-tracker API
     #
     if config_data["datasources"]["covid_tracker"]:
-        #add_covid19_tracker_data(engine, config_data, wikidata_pop)
         add_covid19_tracker_data2(engine, "covid19", config_data, df_pop, add_SE2=True)
 
     add_country_info(engine, "country_info", df_pop, config_data)
