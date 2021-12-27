@@ -9,6 +9,7 @@ from iso3166 import countries
 from sqlalchemy import create_engine
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
+import time
 
 
 # ----------------------------------------------------------------------------------
@@ -18,10 +19,10 @@ from urllib.request import urlopen
 def get_newest_mortality_link():
     url = 'https://www.bfs.admin.ch/bfs/de/home/statistiken/gesundheit/gesundheitszustand/sterblichkeit-todesursachen' \
           '.assetdetail.16006453.html '
-    page = requests.get(url, timeout=2)
+    page = requests.get(url, timeout=20)
     soup = BeautifulSoup(page.content, "html.parser")  # converts the page content into a beautifulsoup object
     new_url = f"https://www.bfs.admin.ch{soup.find('div', {'class': 'alert bg-success glyphicon-refresh text-success'}).find('a', href=True)['href']} "
-    page = requests.get(new_url, timeout=2)
+    page = requests.get(new_url, timeout=20)
     soup = BeautifulSoup(page.content, "html.parser")  # converts the page content into a beautifulsoup object
     new_link = f"https://www.bfs.admin.ch{soup.findAll('a', {'class': 'icon icon--before icon--doc js-ga-bfs-download-event'})[0]['href']}"
     return new_link
@@ -64,7 +65,7 @@ def wikidata_get_population_all_countries():
 
 def is_internet_on():
     try:
-        urlopen('https://www.google.com/', timeout=10)
+        urlopen('https://www.google.com/', timeout=20)
         return True
     except:
         return False
@@ -244,9 +245,9 @@ def add_covid19_tracker_data(engine, table, config_data, df_pop, add_SE2=True):
     ##########################################
     # get data from coronavirus-tracker API
     #
-    url1 = "https://cvtapi.nl/all"
+    url3 = "https://cvtapi.nl/all"
     url2 = "https://coronavirus-tracker-api.herokuapp.com/all"
-    url3 = "https://covid-tracker-us.herokuapp.com/all"
+    url1 = "https://covid-tracker-us.herokuapp.com/all"
     urls = (url1, url2, url3)
 
     valid_response = False
@@ -354,10 +355,14 @@ def add_covid19_tracker_data(engine, table, config_data, df_pop, add_SE2=True):
         3).mean().reset_index(0, drop=True)
     df['newconfirmedfilt7d'] = df.sort_values('date').groupby('countrycode')['newconfirmed'].rolling(
         7).mean().reset_index(0, drop=True)
+    df['newconfirmedfilt14d'] = df.sort_values('date').groupby('countrycode')['newconfirmed'].rolling(
+        14).mean().reset_index(0, drop=True)
     df['newconfirmedperpopfilt3d'] = df.sort_values('date').groupby('countrycode')['newconfirmedperpop'].rolling(
         3).mean().reset_index(0, drop=True)
     df['newconfirmedperpopfilt7d'] = df.sort_values('date').groupby('countrycode')['newconfirmedperpop'].rolling(
         7).mean().reset_index(0, drop=True)
+    df['newconfirmedperpopfilt14d'] = df.sort_values('date').groupby('countrycode')['newconfirmedperpop'].rolling(
+        14).mean().reset_index(0, drop=True)
 
     df['deathsperpop'] = 1e6 / df['country_code_for_pop'].map(df_pop.set_index('countrycode')['population']) * df[
         'deaths']
@@ -368,10 +373,15 @@ def add_covid19_tracker_data(engine, table, config_data, df_pop, add_SE2=True):
                                                                                                                      drop=True)
     df['newdeathsfilt7d'] = df.sort_values('date').groupby('countrycode')['newdeaths'].rolling(7).mean().reset_index(0,
                                                                                                                      drop=True)
+    df['newdeathsfilt14d'] = df.sort_values('date').groupby('countrycode')['newdeaths'].rolling(14).mean().reset_index(
+        0,
+        drop=True)
     df['newdeathsperpopfilt3d'] = df.sort_values('date').groupby('countrycode')['newdeathsperpop'].rolling(
         3).mean().reset_index(0, drop=True)
     df['newdeathsperpopfilt7d'] = df.sort_values('date').groupby('countrycode')['newdeathsperpop'].rolling(
         7).mean().reset_index(0, drop=True)
+    df['newdeathsperpopfilt14d'] = df.sort_values('date').groupby('countrycode')['newdeathsperpop'].rolling(
+        14).mean().reset_index(0, drop=True)
     del df['country_code_for_pop']  # was only used for calculation
     with engine.connect() as con:
         df.to_sql(name=table, con=con, if_exists='replace', index=True)
@@ -446,6 +456,16 @@ def log(engine, status):
     return df_lastupdated
 
 
+def retry(fun, max_tries=10):
+    for i in range(max_tries):
+        try:
+            time.sleep(0.3)
+            fun()
+            break
+        except Exception:
+            continue
+
+
 # end of functins ------------------------------------------------------------------
 
 
@@ -495,21 +515,21 @@ def main():
     # add openzh data (cantons)
     #
     if config_data["datasources"]["openzh_covid19"]:
-        add_openzh_covid19_data(engine, "openzh_covid19")
-
-    ##########################################
-    # add owid covid19 dataset
-    #
-    if config_data["datasources"]["owid_covid19"]:
-        add_owid_covid19_data(engine, "owid_covid19")
+        retry(add_openzh_covid19_data(engine, "openzh_covid19"), 5)
 
     ##########################################
     # get data from coronavirus-tracker API
     #
     if config_data["datasources"]["covid_tracker"]:
-        add_covid19_tracker_data(engine, "covid19", config_data, df_pop, add_SE2=True)
+        retry(add_covid19_tracker_data(engine, "covid19", config_data, df_pop, add_SE2=True), 5)
 
     add_country_info(engine, "country_info", df_pop, config_data)
+
+    ##########################################
+    # add owid covid19 dataset
+    #
+    if config_data["datasources"]["owid_covid19"]:
+        retry(add_owid_covid19_data(engine, "owid_covid19"), 5)
 
     log(engine, "finished")
 
