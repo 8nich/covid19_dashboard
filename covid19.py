@@ -10,6 +10,7 @@ from sqlalchemy import create_engine
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
 import time
+from boto.s3.connection import S3Connection
 
 
 # ----------------------------------------------------------------------------------
@@ -473,12 +474,15 @@ def main():
     ##########################################
     # check internet connection
     #
+    print("started")
     if not is_internet_on():
         print('The Internet connectino is gone, please reconnect and execute again')
         return -1
 
+    print("read config data started")
     config_data = read_json_cfg_file('config.json')
     engine = create_engine(config_data["mysql-engine"])
+    print("read config data finished")
 
     log(engine, "started")
 
