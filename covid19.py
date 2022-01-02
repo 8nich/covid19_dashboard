@@ -11,7 +11,10 @@ from bs4 import BeautifulSoup
 from urllib.request import urlopen
 import time
 import sys
-from boto.s3.connection import S3Connection
+import os
+from dotenv import load_dotenv
+import ast
+
 
 
 # ----------------------------------------------------------------------------------
@@ -475,6 +478,7 @@ def main():
     ##########################################
     # check internet connection
     #
+
     print("started")
     sys.stdout.flush()
     if not is_internet_on():
@@ -483,7 +487,12 @@ def main():
 
     print("read config data started")
     sys.stdout.flush()
-    config_data = read_json_cfg_file('config.json')
+    load_dotenv()
+    config_data = {}
+    config_data["mysql-engine"] = os.getenv('mysql-engine')
+    config_data["countries_of_interest"] = ast.literal_eval(os.getenv('countries_of_interest'))
+    config_data["datasources"] = ast.literal_eval(os.getenv('datasources'))
+
     engine = create_engine(config_data["mysql-engine"])
     print("read config data finished")
     sys.stdout.flush()
