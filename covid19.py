@@ -492,6 +492,7 @@ def main():
     config_data["mysql-engine"] = os.getenv('mysql-engine')
     config_data["countries_of_interest"] = ast.literal_eval(os.getenv('countries_of_interest'))
     config_data["datasources"] = ast.literal_eval(os.getenv('datasources'))
+    print(config_data)
 
     engine = create_engine(config_data["mysql-engine"])
     print("read config data finished")
