@@ -7,6 +7,7 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 import pandas as pd
 from iso3166 import countries
 from sqlalchemy import create_engine
+import MySQLdb
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
 import time
