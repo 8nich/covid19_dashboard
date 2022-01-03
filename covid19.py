@@ -458,12 +458,12 @@ def log(engine, status):
     ##########################################
     # add entry in excel file
     #
-    df_lastupdated = pd.read_excel(r'Last_Updated.xlsx')
+    df_lastupdated = pd.read_csv(r'Last_Updated.csv', sep=';')
     df_lastupdated['last_update_time'] = pd.to_datetime(df_lastupdated['last_update_time'])
     d = {'last_update_time': [datetime.datetime.now().replace(microsecond=0)], 'status': status}
     df = pd.DataFrame(data=d)
     df_lastupdated = df_lastupdated.append(df, ignore_index=True)
-    df_lastupdated.to_excel('Last_Updated.xlsx', index=False)
+    df_lastupdated.to_csv('Last_Updated.csv', index=False, sep=';')
     with engine.connect() as con:
         df_lastupdated.to_sql(name='general_info', con=con, if_exists='replace', index=True)
     engine.dispose()
@@ -487,28 +487,18 @@ def main():
     ##########################################
     # check internet connection
     #
-
     print("started")
-    sys.stdout.flush()
     if not is_internet_on():
         print('The Internet connectino is gone, please reconnect and execute again')
         return -1
 
-    print("read config data started")
-    sys.stdout.flush()
     load_dotenv()
     config_data = {}
     config_data["mysql-engine"] = os.getenv('mysql-engine')
     config_data["countries_of_interest"] = ast.literal_eval(os.getenv('countries_of_interest'))
     config_data["datasources"] = ast.literal_eval(os.getenv('datasources'))
-    print(f"""config_data["mysql-engine"] {type(config_data["mysql-engine"] )}""")
-    print(f"""config_data["countries_of_interest"] {type(config_data["countries_of_interest"] )}""")
-    print(f"""config_data["datasources"] {type(config_data["datasources"] )}""")
-
-    print(config_data)
 
     engine = create_engine(config_data["mysql-engine"])
-    print("read config data finished")
     sys.stdout.flush()
 
     log(engine, "started")
