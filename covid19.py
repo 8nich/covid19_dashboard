@@ -232,15 +232,23 @@ def add_openzh_covid19_data(engine, table):
     return df
 
 
-def add_owid_covid19_data(engine, table):
+def add_owid_covid19_data(engine, table, config_data):
     ##########################################
     # add data from our world in data excel
     # used for tested all countries  ~12MB
     #
-    url = 'https://covid.ourworldindata.org/data/owid-covid-data.xlsx'
+    #url = 'https://covid.ourworldindata.org/data/owid-covid-data.xlsx'
+    url = 'https://covid.ourworldindata.org/data/owid-covid-data.csv'
     myfile = requests.get(url)
-    open('owid-covid-data.xlsx', 'wb').write(myfile.content)
-    df = pd.read_excel(r'owid-covid-data.xlsx')
+    #open('owid-covid-data.xlsx', 'wb').write(myfile.content)
+    open('owid-covid-data.csv', 'wb').write(myfile.content)
+    df = pd.read_csv(r'owid-covid-data.csv', sep=',', low_memory=False)
+
+    country_code_three_digits = []
+    for country_two_digit in config_data['countries_of_interest']:
+        country_code_three_digits.append(countries.get(country_two_digit)[2])
+
+    df = df.loc[df['iso_code'].isin(country_code_three_digits)]
     with engine.connect() as con:
         df.to_sql(name=table, con=con, if_exists='replace', index=True)
     engine.dispose()
@@ -552,7 +560,7 @@ def main():
     # add owid covid19 dataset
     #
     if config_data["datasources"]["owid_covid19"]:
-        retry(add_owid_covid19_data(engine, "owid_covid19"), 5)
+        retry(add_owid_covid19_data(engine, "owid_covid19", config_data), 5)
 
     log(engine, "finished")
 
