@@ -7,7 +7,6 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 import pandas as pd
 from iso3166 import countries
 from sqlalchemy import create_engine
-import MySQLdb
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
 import time
@@ -503,7 +502,7 @@ def main():
     config_data = {}
     config_data["mysql-engine"] = os.getenv('mysql-engine')
     config_data["countries_of_interest"] = ast.literal_eval(os.getenv('countries_of_interest'))
-    config_data["datasources"] = ast.literal_eval(os.getenv('datasources'))
+    config_data["datasources"] = dict(ast.literal_eval(os.getenv('datasources')))
 
     engine = create_engine(config_data["mysql-engine"])
     sys.stdout.flush()
