@@ -458,7 +458,14 @@ def log(engine, status):
     ##########################################
     # add entry in excel file
     #
-    df_lastupdated = pd.read_csv(r'Last_Updated.csv', sep=';')
+
+    # this approach does not work for heroku, because the files will be not persistent
+    #df_lastupdated = pd.read_csv(r'Last_Updated.csv', sep=';')
+
+    # access DB to get last inserts. Other alternative would be to just add
+    with engine.connect() as con:
+        df_lastupdated = pd.read_sql('general_info', con=con, index_col=['index'])
+    engine.dispose()
     df_lastupdated['last_update_time'] = pd.to_datetime(df_lastupdated['last_update_time'])
     d = {'last_update_time': [datetime.datetime.now().replace(microsecond=0)], 'status': status}
     df = pd.DataFrame(data=d)
