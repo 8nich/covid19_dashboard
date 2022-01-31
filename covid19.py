@@ -99,7 +99,7 @@ def add_bfs_mortality(engine, table):
     url = get_newest_mortality_link()
     myfile = requests.get(url)
     open('ts-d-14.03.04.03-wr.csv', 'wb').write(myfile.content)
-    df2 = pd.read_csv('ts-d-14.03.04.03-wr.csv', sep=';', nrows=210, parse_dates=['endend'], date_parser=dateparse,
+    df2 = pd.read_csv('ts-d-14.03.04.03-wr.csv', sep=';',nrows=314, parse_dates=['endend'], date_parser=dateparse,
                       na_values='           .')
     df2 = df2.rename(columns={'Alter': 'Age', 'endend': 'Date', 'Jahr': 'KJ'})
 
