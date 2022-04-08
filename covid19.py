@@ -29,7 +29,8 @@ def get_newest_mortality_link():
     new_url = f"https://www.bfs.admin.ch{soup.find('div', {'class': 'alert bg-success glyphicon-refresh text-success'}).find('a', href=True)['href']} "
     page = requests.get(new_url, timeout=20)
     soup = BeautifulSoup(page.content, "html.parser")  # converts the page content into a beautifulsoup object
-    new_link = f"https://www.bfs.admin.ch{soup.findAll('a', {'class': 'icon icon--before icon--doc js-ga-bfs-download-event'})[0]['href']}"
+    # new_link = f"https://www.bfs.admin.ch{soup.findAll('a', {'class': 'icon icon--before icon--doc js-ga-bfs-download-event'})[0]['href']}"
+    new_link = f"{soup.findAll('a', {'class': 'icon icon--before icon--doc js-ga-bfs-download-event'})[0]['href']}"
     return new_link
 
 
