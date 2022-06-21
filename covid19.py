@@ -79,34 +79,16 @@ def is_internet_on():
 
 def add_bfs_mortality(engine, table):
     ##########################################
-    # add mortality 2010 ... 2019
-    #
-    #
-    dateparse = lambda x: datetime.datetime.strptime(x, '%d.%m.%Y')
-    url = 'https://www.bfs.admin.ch/bfsstatic/dam/assets/12607336/master'
-    myfile = requests.get(url)
-    open('ts-d-14.03.04.03-wr_ZR.csv', 'wb').write(myfile.content)
-    df1 = pd.read_csv('ts-d-14.03.04.03-wr_ZR.csv', sep=';', nrows=1042, parse_dates=['Endend'], date_parser=dateparse,
-                      na_values='           .')
-    df1 = df1.rename(
-        columns={'Alter': 'Age', 'Endend': 'Date', 'Anzahl_Todesfalle': 'AnzTF_HR', 'Kalenderwoche': 'Woche'})
-    # store in sql later
-
-    ##########################################
-    # add mortality 2020 + 2021
+    # mortality 2010 ... 2022
     #
     #
     dateparse = lambda x: datetime.datetime.strptime(x, '%d.%m.%Y')
     url = get_newest_mortality_link()
     myfile = requests.get(url)
     open('ts-d-14.03.04.03-wr.csv', 'wb').write(myfile.content)
-    df2 = pd.read_csv('ts-d-14.03.04.03-wr.csv', sep=';',nrows=314, parse_dates=['endend'], date_parser=dateparse,
-                      na_values='           .')
-    df2 = df2.rename(columns={'Alter': 'Age', 'endend': 'Date', 'Jahr': 'KJ'})
-
-    # concatenate 2010 ... 2019 and 2020/2021
-    df = pd.concat([df1, df2], ignore_index=True)
-    df['Age'] = df['Age'].str.strip()
+    df = pd.read_csv('ts-d-14.03.04.03-wr.csv', sep=';', nrows=1356, parse_dates=['endend'], date_parser=dateparse,
+                      encoding="cp1252", na_values='           .')
+    df = df.rename(columns={'Alter': 'Age', 'endend': 'Date', 'Jahr': 'KJ'})
 
     df['AnzTF_HRfilt'] = df.sort_values('Date').groupby('Age')['AnzTF_HR'].rolling(12).mean().reset_index(0, drop=True)
     with engine.connect() as con:
@@ -470,6 +452,7 @@ def log(engine, status):
     d = {'last_update_time': [datetime.datetime.now().replace(microsecond=0)], 'status': status}
     df = pd.DataFrame(data=d)
     df_lastupdated = df_lastupdated.append(df, ignore_index=True)
+    #df_lastupdated = df_lastupdated.concat(df, ignore_index=True)
     df_lastupdated.to_csv('Last_Updated.csv', index=False, sep=';')
     with engine.connect() as con:
         df_lastupdated.to_sql(name='general_info', con=con, if_exists='replace', index=True)
@@ -510,13 +493,14 @@ def main():
 
     log(engine, "started")
 
+
     ##########################################
     # get population of All countries
     #
     df_pop = wikidata_get_population_all_countries()
 
     ##########################################
-    # add mortality from 2010 ... 2021
+    # add mortality from 2010 ... 2022
     #
     if config_data["datasources"]["bfs_mortality"]:
         add_bfs_mortality(engine, "bfs_covid19")
