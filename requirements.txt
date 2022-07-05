@@ -6,4 +6,4 @@ pandas==1.4.2
 python-dotenv==0.19.2
 requests==2.25.1
 SPARQLWrapper==1.8.5
-SQLAlchemy==1.3.23
+SQLAlchemy==1.4.0
