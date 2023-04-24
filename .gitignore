@@ -12,3 +12,4 @@
 /.env
 /owid-covid-data.csv
 /venv/
+/pyvenv

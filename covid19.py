@@ -6,6 +6,7 @@ import copy
 from SPARQLWrapper import SPARQLWrapper, JSON
 import pandas as pd
 from iso3166 import countries
+import pymysql
 from sqlalchemy import create_engine
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
@@ -86,7 +87,7 @@ def add_bfs_mortality(engine, table):
     url = get_newest_mortality_link()
     myfile = requests.get(url)
     open('ts-d-14.03.04.03-wr.csv', 'wb').write(myfile.content)
-    df = pd.read_csv('ts-d-14.03.04.03-wr.csv', sep=';', nrows=1356, parse_dates=['endend'], date_parser=dateparse,
+    df = pd.read_csv('ts-d-14.03.04.03-wr.csv', sep=';', nrows=1460, parse_dates=['endend'], date_parser=dateparse,
                       encoding="cp1252", na_values='           .')
     df = df.rename(columns={'Alter': 'Age', 'endend': 'Date', 'Jahr': 'KJ'})
 
